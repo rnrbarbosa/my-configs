@@ -1,0 +1,24 @@
+global
+    daemon
+    maxconn 256
+
+defaults
+    mode http
+    timeout connect 5000ms
+    timeout client 50000ms
+    timeout server 50000ms
+
+frontend http-in *:80
+    redirect scheme https if !{ ssl_fc }
+
+frontend https-in
+  mode http
+  bind 0.0.0.0:443 ssl crt /etc/haproxy/certs/server.pem
+  default_backend openerp
+
+backend openerp
+    server oerp1 127.0.0.1:8080 maxconn 32
+
+listen admin
+    bind 192.168.22.131:8888
+    stats enable
