@@ -1,0 +1,54 @@
+upstream backend_server {
+    server 127.0.0.1:9999 weight=1 fail_timeout=300s;
+}
+
+server {
+    listen <ip_public_1>:80 default;
+    server_name www.domain.com;
+
+    # Strict Transport Security
+    add_header Strict-Transport-Security max-age=2592000;
+
+    rewrite ^/.*$ https://$host$request_uri? permanent;
+
+}
+
+server {
+    	listen <ip_public_1>:443 default;
+        server_name www.domain.com;
+	error_log   /var/log/nginx/errors_www.domain.com.log debug;
+
+	client_max_body_size 10m;
+
+        # ssl certificate files
+        ssl on;
+        ssl_certificate        /etc/ssl/nginx/server.crt;
+        ssl_certificate_key    /etc/ssl/nginx/server.key;
+
+        # add ssl specific settings
+        keepalive_timeout    60;
+
+        # limit ciphers
+        ssl_ciphers            HIGH:!ADH:!MD5;
+        ssl_protocols            SSLv3 TLSv1;
+        ssl_prefer_server_ciphers    on;
+	proxy_read_timeout 300;
+        location / {
+                proxy_pass  http://backend_server;
+
+		# force timeouts if the backend dies
+		proxy_next_upstream error timeout invalid_header http_500 http_502 http_503;
+
+		# set headers
+		proxy_set_header Host $host;
+		proxy_set_header X-Real-IP $remote_addr;
+		proxy_set_header X-Forward-For $proxy_add_x_forwarded_for;
+
+		# Let the OpenERP web service know that we're using HTTPS, otherwise
+		# it will generate URL using http:// and not https://
+		proxy_set_header X-Forwarded-Proto https;
+
+		# by default, do not forward anything
+		proxy_redirect off;
+	}
+}
